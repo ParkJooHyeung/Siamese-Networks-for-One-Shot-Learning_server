@@ -1,21 +1,18 @@
+# Siamese_network with Graph
 import os
 
-import keras.backend as K
 from keras.models import Model, Sequential
-from keras.layers import Conv2D, MaxPool2D, Flatten, Dense, Input, Subtract, Lambda
+from keras.layers import Conv2D, MaxPool2D, Flatten, Dense, Input, Subtract, Lambda, BatchNormalization, Dropout
 from keras.optimizers import Adam, SGD
 from keras.regularizers import l2
-import keras.backend as K
+from tensorflow.keras import backend as K
 
 import tensorflow as tf
 
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-import numpy as np
 
 from omniglot_loader import OmniglotLoader
 from modified_sgd import Modified_SGD
-
 
 class SiameseNetwork:
     """Class that constructs the Siamese Net for training
@@ -34,14 +31,14 @@ class SiameseNetwork:
                  learning_rate_multipliers, l2_regularization_penalization, tensorboard_log_path):
         """Inits SiameseNetwork with the provided values for the attributes.
 
-        It also constructs the siamese network architecture, creates a dataset 
+        It also constructs the siamese network architecture, creates a dataset
         loader and opens the log file.
 
         Arguments:
-            dataset_path: path of Omniglot dataset    
+            dataset_path: path of Omniglot dataset
             learning_rate: SGD learning rate
             batch_size: size of the batch to be used in training
-            use_augmentation: boolean that allows us to select if data augmentation 
+            use_augmentation: boolean that allows us to select if data augmentation
                 is used or not
             learning_rate_multipliers: learning-rate multipliers (relative to the learning_rate
                 chosen) that will be applied to each fo the conv and dense layers
@@ -60,16 +57,23 @@ class SiameseNetwork:
                     L2_dictionary['conv2']=0.001
                     L2_dictionary['dense1']=0.001
                     L2_dictionary['dense2']=0.01
-            tensorboard_log_path: path to store the logs                
+            tensorboard_log_path: path to store the logs
         """
         self.input_shape = (105, 105, 1)  # Size of images
         self.model = []
         self.learning_rate = learning_rate
         self.omniglot_loader = OmniglotLoader(
             dataset_path=dataset_path, use_augmentation=use_augmentation, batch_size=batch_size)
-        self.summary_writer = tf.summary.FileWriter(tensorboard_log_path)
+        # self.summary_writer = tf.summary.FileWriter(tensorboard_log_path)
         self._construct_siamese_architecture(learning_rate_multipliers,
                                               l2_regularization_penalization)
+        log_dir = "/content/drive/MyDrive/logs"  # 로그 디렉토리는 적절하게 변경 가능
+        self.summary_writer = tf.summary.create_file_writer(log_dir)
+        self.current_iteration = 0  # 현재 iteration을 저장할 변수 추가
+
+        self.current_iteration = 0  # 현재 iteration을 저장할 변수 추가
+        self.train_losses = []  # Train losses for each iteration
+        self.train_accuracies = []  # Train accuracies for each iteration
 
     def _construct_siamese_architecture(self, learning_rate_multipliers,
                                          l2_regularization_penalization):
@@ -116,6 +120,9 @@ class SiameseNetwork:
                   kernel_regularizer=l2(
                       l2_regularization_penalization['Dense1']),
                   name='Dense1'))
+        convolutional_net.add(BatchNormalization())
+        # Dropout 추가
+        convolutional_net.add(Dropout(0.5))
 
         # Now the pairs of images
         input_image_1 = Input(self.input_shape)
@@ -137,151 +144,127 @@ class SiameseNetwork:
 
         # Define the optimizer and compile the model
         optimizer = Modified_SGD(
-            lr=self.learning_rate,
+            learning_rate=self.learning_rate,
             lr_multipliers=learning_rate_multipliers,
             momentum=0.5)
+        # optimizer = 'adam'
 
         self.model.compile(loss='binary_crossentropy', metrics=['binary_accuracy'],
                            optimizer=optimizer)
 
-    def _write_logs_to_tensorboard(self, current_iteration, train_losses,
-                                    train_accuracies, validation_accuracy,
-                                    evaluate_each):
-        """ Writes the logs to a tensorflow log file
+        # 훈련 손실 및 정확도를 저장할 리스트 초기화
+        self.train_losses = []
+        self.train_accuracies = []
 
-        This allows us to see the loss curves and the metrics in tensorboard.
-        If we wrote every iteration, the training process would be slow, so 
-        instead we write the logs every evaluate_each iteration.
+    def _write_logs_to_tensorboard(self, current_iteration, validation_accuracy, evaluate_each, train_loss, train_accuracy):
+        """텐서보드 로그를 작성하고 그래프를 그립니다."""
+        # 손실 및 정확도를 리스트에 추가합니다
+        self.train_losses.append(train_loss)
+        self.train_accuracies.append(train_accuracy)
+
+        with self.summary_writer.as_default():
+            # 손실과 정확도를 텐서보드에 기록
+            tf.summary.scalar('Train Loss', train_loss, step=current_iteration)
+            tf.summary.scalar('Train Accuracy', train_accuracy, step=current_iteration)
+            tf.summary.scalar('One-Shot Validation Accuracy', validation_accuracy, step=current_iteration)
+
+            # summary_writer로 내용을 즉시 쓰기
+            self.summary_writer.flush()
+
+        # 그래프 그리기
+        self._plot_graphs(current_iteration, self.train_losses, self.train_accuracies, validation_accuracy, evaluate_each)
+
+
+    def _plot_graphs(self, current_iteration, train_losses, train_accuracies, validation_accuracy, evaluate_each):
+        """ 손실 및 정확도에 대한 그래프를 그립니다.
 
         Arguments:
-            current_iteration: iteration to be written in the log file
-            train_losses: contains the train losses from the last evaluate_each
-                iterations.
-            train_accuracies: the same as train_losses but with the accuracies
-                in the training set.
-            validation_accuracy: accuracy in the current one-shot task in the 
-                validation set
-            evaluate each: number of iterations defined to evaluate the one-shot
-                tasks.
+            current_iteration: x축에 표시될 반복 횟수
+            train_losses: 훈련 손실의 리스트
+            train_accuracies: 훈련 정확도의 리스트
+            validation_accuracy: 현재 원샷 검증 정확도
+            evaluate_each: evaluate_each 반복마다 기록된 리스트
         """
+        iterations = list(range(current_iteration - len(train_losses) + 1, current_iteration + 1))
 
-        summary = tf.Summary()
+        # 훈련 손실 플로팅
+        plt.figure(figsize=(12, 6))
+        plt.subplot(1, 2, 2)
+        plt.plot(iterations, train_losses, label='Train Loss', marker='o', color='blue')
+        plt.title('Train Loss over Iterations')
+        plt.xlabel('Iterations')
+        plt.ylabel('Loss')
+        plt.legend()
 
-        # Write to log file the values from the last evaluate_every iterations
-        for index in range(0, evaluate_each):
-            value = summary.value.add()
-            value.simple_value = train_losses[index]
-            value.tag = 'Train Loss'
+        # 훈련 정확도 플로팅
+        plt.subplot(1, 2, 2)
+        plt.plot(iterations, train_accuracies, label='Train Accuracy', marker='o', color='red')
+        plt.title('Train Accuracy over Iterations')
+        plt.xlabel('Iterations')
+        plt.ylabel('Accuracy')
+        plt.legend()
 
-            value = summary.value.add()
-            value.simple_value = train_accuracies[index]
-            value.tag = 'Train Accuracy'
-
-            if index == (evaluate_each - 1):
-                value = summary.value.add()
-                value.simple_value = validation_accuracy
-                value.tag = 'One-Shot Validation Accuracy'
-
-            self.summary_writer.add_summary(
-                summary, current_iteration - evaluate_each + index + 1)
-            self.summary_writer.flush()
+        # 플롯 보여주기
+        plt.tight_layout()
+        plt.show()
 
     def train_siamese_network(self, number_of_iterations, support_set_size,
                               final_momentum, momentum_slope, evaluate_each,
                               model_name):
-        """ Train the Siamese net
+        # 먼저 30개의 학습 알파벳을 24개는 학습, 6개는 검증으로 무작위로 나눕니다.
+        # self.omniglot_loader.split_train_datasets()
 
-        This is the main function for training the siamese net. 
-        In each every evaluate_each train iterations we evaluate one-shot tasks in 
-        validation and evaluation set. We also write to the log file.
-
-        Arguments:
-            number_of_iterations: maximum number of iterations to train.
-            support_set_size: number of characters to use in the support set
-                in one-shot tasks.
-            final_momentum: mu_j in the paper. Each layer starts at 0.5 momentum
-                but evolves linearly to mu_j
-            momentum_slope: slope of the momentum evolution. In the paper we are
-                only told that this momentum evolves linearly. Because of that I 
-                defined a slope to be passed to the training.
-            evaluate each: number of iterations defined to evaluate the one-shot
-                tasks.
-            model_name: save_name of the model
-
-        Returns: 
-            Evaluation Accuracy
-        """
-
-        # First of all let's divide randomly the 30 train alphabets in train
-        # and validation with 24 for training and 6 for validation
-        self.omniglot_loader.split_train_datasets()
-
-        # Variables that will store 100 iterations losses and accuracies
-        # after evaluate_each iterations these will be passed to tensorboard logs
-        train_losses = np.zeros(shape=(evaluate_each))
-        train_accuracies = np.zeros(shape=(evaluate_each))
+        # evaluate_each 번 반복마다 tensorboard 로그에 전달될 100번의 반복 손실 및 정확도를 저장할 변수
+        self.train_losses = []
+        self.train_accuracies = []
         count = 0
-        earrly_stop = 0
-        # Stop criteria variables
+        early_stop = 0  # Fix typo: earrly_stop -> early_stop
+        # 조기 중지 기준 변수
         best_validation_accuracy = 0.0
         best_accuracy_iteration = 0
         validation_accuracy = 0.0
 
-
-        # Train loop
         for iteration in range(number_of_iterations):
-
-            # train set
             images, labels = self.omniglot_loader.get_train_batch()
-            train_loss, train_accuracy = self.model.train_on_batch(
-                images, labels)
-
-            # Decay learning rate 1 % per 500 iterations (in the paper the decay is
-            # 1% per epoch). Also update linearly the momentum (starting from 0.5 to 1)
+            try:
+                train_loss, train_accuracy = self.model.train_on_batch(images, labels)
+            except Exception as e:
+                print(f"Exception during training on batch: {e}")
+                continue
             if (iteration + 1) % 500 == 0:
                 K.set_value(self.model.optimizer.lr, K.get_value(
                     self.model.optimizer.lr) * 0.99)
             if K.get_value(self.model.optimizer.momentum) < final_momentum:
-                K.set_value(self.model.optimizer.momentum, K.get_value(
-                    self.model.optimizer.momentum) + momentum_slope)
-
-            train_losses[count] = train_loss
-            train_accuracies[count] = train_accuracy
+                new_momentum_value = K.get_value(self.model.optimizer.momentum) + momentum_slope
+                self.model.optimizer.momentum = new_momentum_value
 
             # validation set
             count += 1
             print('Iteration %d/%d: Train loss: %f, Train Accuracy: %f, lr = %f' %
-                  (iteration + 1, number_of_iterations, train_loss, train_accuracy, K.get_value(
-                      self.model.optimizer.lr)))
+                  (iteration + 1, number_of_iterations, train_loss, train_accuracy, K.get_value(self.model.optimizer.lr)))
 
-            # Each 100 iterations perform a one_shot_task and write to tensorboard the
-            # stored losses and accuracies
+            # 각 100번 반복마다 one_shot_task 수행 및 저장된 손실 및 정확도를 tensorboard에 기록
             if (iteration + 1) % evaluate_each == 0:
                 number_of_runs_per_alphabet = 40
-                # use a support set size equal to the number of character in the alphabet
                 validation_accuracy = self.omniglot_loader.one_shot_test(
                     self.model, support_set_size, number_of_runs_per_alphabet, is_validation=True)
 
-                self._write_logs_to_tensorboard(
-                    iteration, train_losses, train_accuracies,
-                    validation_accuracy, evaluate_each)
+                self._write_logs_to_tensorboard(iteration + 1, validation_accuracy, evaluate_each, train_loss, train_accuracy)
                 count = 0
 
-                # Some hyperparameters lead to 100%, although the output is almost the same in 
-                # all images. 
+                # 일부 초매개변수는 100%로 이끄는데, 출력은 거의 모든 이미지에서 동일합니다.
                 if (validation_accuracy == 1.0 and train_accuracy == 0.5):
                     print('Early Stopping: Gradient Explosion')
-                    print('Validation Accuracy = ' +
-                          str(best_validation_accuracy))
+                    print('Validation Accuracy = ' + str(best_validation_accuracy))
                     return 0
                 elif train_accuracy == 0.0:
                     return 0
                 else:
-                    # Save the model
+                    # 모델 저장
                     if validation_accuracy > best_validation_accuracy:
                         best_validation_accuracy = validation_accuracy
                         best_accuracy_iteration = iteration
-                        
+
                         model_json = self.model.to_json()
 
                         if not os.path.exists('./models'):
@@ -290,14 +273,15 @@ class SiameseNetwork:
                             json_file.write(model_json)
                         self.model.save_weights('models/' + model_name + '.h5')
 
-            # If accuracy does not improve for 10000 batches stop the training
+            # 1만 번 동안 정확도가 향상되지 않으면 훈련 중지
             if iteration - best_accuracy_iteration > 10000:
-                print(
-                    'Early Stopping: validation accuracy did not increase for 10000 iterations')
-                print('Best Validation Accuracy = ' +
-                      str(best_validation_accuracy))
+                print('Early Stopping: validation accuracy did not increase for 10000 iterations')
+                print('Best Validation Accuracy = ' + str(best_validation_accuracy))
                 print('Validation Accuracy = ' + str(best_validation_accuracy))
                 break
+
+        self.train_losses = np.array([])
+        self.train_accuracies = np.array([])
 
         print('Trained Ended!')
         return best_validation_accuracy

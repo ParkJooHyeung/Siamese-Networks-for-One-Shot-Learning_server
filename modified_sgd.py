@@ -1,104 +1,62 @@
-from keras.legacy import interfaces
-import keras.backend as K
-from keras.optimizers import Optimizer
+# Modified_SGD
+import tensorflow as tf
 
+class Modified_SGD(tf.keras.optimizers.SGD):
+    def __init__(self, learning_rate=0.01, momentum=0.0, nesterov=False, lr_multipliers=None, momentum_multipliers=None, name="Modified_SGD", **kwargs):
+        # Remove decay from kwargs
+        kwargs.pop('decay', None)
 
-class Modified_SGD(Optimizer):
-    """ Modified Stochastic gradient descent optimizer.
-
-    Almost all this class is Keras SGD class code. I just reorganized it
-    in this class to allow layer-wise momentum and learning-rate
-
-    Includes support for momentum,
-    learning rate decay, and Nesterov momentum.
-    Includes the possibility to add multipliers to different
-    learning rates in each layer.
-
-    # Arguments
-        lr: float >= 0. Learning rate.
-        momentum: float >= 0. Parameter updates momentum.
-        decay: float >= 0. Learning rate decay over each update.
-        nesterov: boolean. Whether to apply Nesterov momentum.
-        lr_multipliers: dictionary with learning rate for a specific layer
-        for example:
-            # Setting the Learning rate multipliers
-            LR_mult_dict = {}
-            LR_mult_dict['c1']=1
-            LR_mult_dict['c2']=1
-            LR_mult_dict['d1']=2
-            LR_mult_dict['d2']=2
-        momentum_multipliers: dictionary with momentum for a specific layer 
-        (similar to the lr_multipliers)
-    """
-
-    def __init__(self, lr=0.01, momentum=0., decay=0.,
-                 nesterov=False, lr_multipliers=None, momentum_multipliers=None, **kwargs):
-        super(Modified_SGD, self).__init__(**kwargs)
-        with K.name_scope(self.__class__.__name__):
-            self.iterations = K.variable(0, dtype='int64', name='iterations')
-            self.lr = K.variable(lr, name='lr')
-            self.momentum = K.variable(momentum, name='momentum')
-            self.decay = K.variable(decay, name='decay')
-        self.initial_decay = decay
-        self.nesterov = nesterov
+        super(Modified_SGD, self).__init__(learning_rate=learning_rate, momentum=momentum, nesterov=nesterov, name=name, **kwargs)
         self.lr_multipliers = lr_multipliers
         self.momentum_multipliers = momentum_multipliers
 
-    @interfaces.legacy_get_updates_support
-    def get_updates(self, loss, params):
-        grads = self.get_gradients(loss, params)
-        self.updates = [K.update_add(self.iterations, 1)]
+    def _resource_apply_dense(self, grad, var):
+        var_dtype = var.dtype.base_dtype
+        lr_t = self._decayed_lr(var_dtype)
+        momentum_var = self.get_slot(var, "momentum")
 
-        lr = self.lr
-        if self.initial_decay > 0:
-            lr *= (1. / (1. + self.decay * K.cast(self.iterations,
-                                                  K.dtype(self.decay))))
-        
-        
-        # momentum
-        shapes = [K.int_shape(p) for p in params]
-        moments = [K.zeros(shape) for shape in shapes]
-        self.weights = [self.iterations] + moments
-        for p, g, m in zip(params, grads, moments):
+        if self.nesterov:
+            update = grad * lr_t + self.momentum * momentum_var
+            var_update = var.assign_sub(update)
+        else:
+            var_update = var.assign_sub(lr_t * grad)
 
-            if self.lr_multipliers != None:
-                if p.name in self.lr_multipliers:
-                    new_lr = lr * self.lr_multipliers[p.name]
-                else:
-                    new_lr = lr
-            else:
-                new_lr = lr
+        if self.nesterov:
+            momentum_update = momentum_var.assign_add(self.momentum * momentum_var + grad * lr_t)
+            return tf.group([var_update, momentum_update])
+        else:
+            return var_update
 
-            if self.momentum_multipliers != None:
-                if p.name in self.momentum_multipliers:
-                    new_momentum = self.momentum * \
-                        self.momentum_multipliers[p.name]
-                else:
-                    new_momentum = self.momentum
-            else:
-                new_momentum = self.momentum
+    def _resource_apply_sparse(self, grad, var, indices):
+        var_dtype = var.dtype.base_dtype
+        lr_t = self._decayed_lr(var_dtype)
+        momentum_var = self.get_slot(var, "momentum")
 
-            v = new_momentum * m - new_lr * g  # velocity
-            self.updates.append(K.update(m, v))
+        if self.nesterov:
+            update = grad.values * lr_t + self.momentum * momentum_var
+            var_update = var.scatter_sub(indices, update)
+        else:
+            var_update = var.scatter_sub(indices, lr_t * grad.values)
 
-            if self.nesterov:
-                new_p = p + new_momentum * v - new_lr * g
-            else:
-                new_p = p + v
+        if self.nesterov:
+            momentum_update = momentum_var.scatter_add(indices, self.momentum * momentum_var + grad.values * lr_t)
+            return tf.group([var_update, momentum_update])
+        else:
+            return var_update
 
-            # Apply constraints.
-            if getattr(p, 'constraint', None) is not None:
-                new_p = p.constraint(new_p)
+    def _decayed_lr(self, var_dtype):
+        lr_t = self.learning_rate
+        if not isinstance(lr_t, (tf.Tensor, tf.Variable)):
+            initial_lr_t = tf.convert_to_tensor(lr_t, dtype=var_dtype)
+            lr_t = tf.compat.v1.train.polynomial_decay(
+                initial_lr_t,
+                self.iterations,
+                self.decay_steps,
+                end_learning_rate=self.end_learning_rate,
+                power=1.0,
+                cycle=False)
+        return lr_t.numpy() if hasattr(lr_t, 'numpy') else lr_t
 
-            self.updates.append(K.update(p, new_p))
-        return self.updates
-
-    def get_config(self):
-        config = {'lr': float(K.get_value(self.lr)),
-                  'momentum': float(K.get_value(self.momentum)),
-                  'decay': float(K.get_value(self.decay)),
-                  'nesterov': self.nesterov,
-                  'lr_multipliers': float(K.get_value(self.lr_multipliers)),
-                  'momentum_multipliers': float(K.get_value(self.momentum_multipliers))}
-        base_config = super(Modified_SGD, self).get_config()
-        return dict(list(base_config.items()) + list(config.items()))
+    def set_lr_schedule(self, decay_steps, end_learning_rate):
+        self.decay_steps = decay_steps
+        self.end_learning_rate = end_learning_rate

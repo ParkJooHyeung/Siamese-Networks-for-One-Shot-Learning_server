@@ -1,3 +1,5 @@
+# Image_augmentor
+
 import numpy as np
 import scipy.ndimage as ndi
 import matplotlib.pyplot as plt
@@ -29,8 +31,8 @@ class ImageAugmentor:
 
     def _transform_matrix_offset_center(self, transformation_matrix, width, height):
         """ Corrects the offset of tranformation matrix
-        
-            Corrects the offset of tranformation matrix for the specified image 
+
+            Corrects the offset of tranformation matrix for the specified image
             dimensions by considering the center of the image as the central point
 
             Args:
@@ -105,7 +107,7 @@ class ImageAugmentor:
         image = self._apply_transform(image, transformation_matrix)
 
         return image
-    
+
     def _perform_random_shear(self, image):
         """ Applies a random shear
 
@@ -129,13 +131,13 @@ class ImageAugmentor:
 
         return image
 
-    
+
     def _perform_random_shift(self, image):
         """ Applies a random shift in x and y
 
             Args:
                 image: image to be augmented
-        
+
             Returns:
                 The transformed image
         """
@@ -158,7 +160,7 @@ class ImageAugmentor:
 
             Args:
                 image: image to be augmented
-        
+
             Returns:
                 The transformed image
         """
@@ -174,13 +176,13 @@ class ImageAugmentor:
 
         return image
 
-    
+
     def get_random_transform(self, images):
         """ Applies a random augmentation to pairs of images
 
             Args:
                 images: pairs of the batch to be augmented
-        
+
             Returns:
                 The transformed images
         """

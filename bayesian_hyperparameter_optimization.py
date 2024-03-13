@@ -8,7 +8,6 @@ current_model_number = 0
 
 
 def main():
-
     hyperparameters = [{'name': 'learning_rate', 'type': 'continuous',
                         'domain': (10e-6, 10e-4)},
                        {'name': 'momentum', 'type': 'continuous',
@@ -54,8 +53,8 @@ def main():
         current_dense1_penalization = float(x[:, 12])
 
         model_name = 'siamese_net_lr_' + str(current_learning_rate) + \
-            'momentum_' + str(current_momentum) + '_slope_' + \
-            str(current_momentum_slope)
+                     'momentum_' + str(current_momentum) + '_slope_' + \
+                     str(current_momentum_slope)
 
         global current_model_number
         current_model_number += 1
@@ -90,7 +89,7 @@ def main():
         support_set_size = 20
         evaluate_each = 500
         number_of_train_iterations = 100000
-        
+
         validation_accuracy = siamese_network.train_siamese_network(number_of_iterations=number_of_train_iterations,
                                                                     support_set_size=support_set_size,
                                                                     final_momentum=current_momentum,
@@ -100,7 +99,7 @@ def main():
 
         if validation_accuracy == 0:
             evaluation_accuracy = 0
-        else:        
+        else:
             # Load the weights with best validation accuracy
             siamese_network.model.load_weights('models/' + model_name + '.h5')
             evaluation_accuracy = siamese_network.omniglot_loader.one_shot_test(siamese_network.model,
