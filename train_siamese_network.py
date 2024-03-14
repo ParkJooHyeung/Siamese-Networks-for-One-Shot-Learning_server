@@ -5,7 +5,7 @@ from siamese_network import SiameseNetwork
 
 
 def main():
-    dataset_path = '/content/drive/MyDrive/HCG/split_data 복사본'
+    dataset_path = '/home/server3/jhpark/split_data_best_concentration'
     use_augmentation = True
     learning_rate = 10e-4
     batch_size = 32

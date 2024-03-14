@@ -1,42 +1,42 @@
 import GPy
 import GPyOpt
 import keras.backend as K
+import os
 
 from siamese_network import SiameseNetwork
 
 current_model_number = 0
 
-
 def main():
     hyperparameters = [{'name': 'learning_rate', 'type': 'continuous',
-                        'domain': (10e-6, 10e-4)},
+                        'domain': (10e-8, 10e-6, 10e-4, 10e-2)},
                        {'name': 'momentum', 'type': 'continuous',
-                        'domain': (0.0, 1.0)},
+                        'domain': (0.0, 0.5, 1.0)},
                        {'name': 'momentum_slope', 'type': 'continuous',
-                        'domain': (0.001, 0.1)},
+                        'domain': (0.001, 0.01, 0.1)},
                        {'name': 'Conv1_multiplier', 'type': 'discrete',
-                        'domain': (0.01, 0.1, 1, 10)},
+                        'domain': (0.001, 0.01, 0.1, 1, 10, 100)},
                        {'name': 'Conv2_multiplier', 'type': 'discrete',
-                        'domain': (0.01, 0.1, 1, 10)},
+                        'domain': (0.001, 0.01, 0.1, 1, 10, 100)},
                        {'name': 'Conv3_multiplier', 'type': 'discrete',
-                        'domain': (0.01, 0.1, 1, 10)},
+                        'domain': (0.001, 0.01, 0.1, 1, 10, 100)},
                        {'name': 'Conv4_multiplier', 'type': 'discrete',
-                        'domain': (0.01, 0.1, 1, 10)},
+                        'domain': (0.001, 0.01, 0.1, 1, 10, 100)},
                        {'name': 'Dense1_multiplier', 'type': 'discrete',
-                        'domain': (0.01, 0.1, 1, 10)},
+                        'domain': (0.001, 0.01, 0.1, 1, 10, 100)},
                        {'name': 'l2_penalization_Conv1', 'type': 'discrete',
-                        'domain': (0, 0.0001, 0.001, 0.01, 0.1)},
+                        'domain': (0, 0.00001, 0.0001, 0.001, 0.01, 0.1)},
                        {'name': 'l2_penalization_Conv2', 'type': 'discrete',
-                        'domain': (0, 0.0001, 0.001, 0.01, 0.1)},
+                        'domain': (0, 0.00001, 0.0001, 0.001, 0.01, 0.1)},
                        {'name': 'l2_penalization_Conv3', 'type': 'discrete',
-                        'domain': (0, 0.0001, 0.001, 0.01, 0.1)},
+                        'domain': (0, 0.00001, 0.0001, 0.001, 0.01, 0.1)},
                        {'name': 'l2_penalization_Conv4', 'type': 'discrete',
-                        'domain': (0, 0.0001, 0.001, 0.01, 0.1)},
+                        'domain': (0, 0.00001, 0.0001, 0.001, 0.01, 0.1)},
                        {'name': 'l2_penalization_Dense1', 'type': 'discrete',
-                        'domain': (0, 0.0001, 0.001, 0.01, 0.1)}]
+                        'domain': (0, 0.00001, 0.0001, 0.001, 0.01, 0.1)}]
 
     def bayesian_optimization_function(x):
-        dataset_path = 'Omniglot Dataset'
+        dataset_path = '/home/server3/jhpark/split_data_best_concentration'
 
         current_learning_rate = float(x[:, 0])
         current_momentum = float(x[:, 1])
@@ -88,7 +88,8 @@ def main():
 
         support_set_size = 20
         evaluate_each = 500
-        number_of_train_iterations = 100000
+        number_of_train_iterations = 10000
+        # number_of_train_iterations = 100000
 
         validation_accuracy = siamese_network.train_siamese_network(number_of_iterations=number_of_train_iterations,
                                                                     support_set_size=support_set_size,

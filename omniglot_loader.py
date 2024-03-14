@@ -52,7 +52,7 @@ class OmniglotLoader:
         if self.use_augmentation:
             image_folder_name += '_augmented'
 
-        image_path = os.path.join(self.dataset_path, 'split_data', 'train', current_class)
+        image_path = os.path.join(self.dataset_path, 'split_data_copy', 'train', current_class)
         # return os.path.join(image_path, self.train_dictionary[current_alphabet][current_character][image_indexes[0]])
         return os.path.join(image_path, self.train_dictionary[image_indexes[0]])
 
@@ -164,8 +164,8 @@ class OmniglotLoader:
             available_alphabets.pop(index)
 
         # The remaining alphabets are saved for validation
-        self._validation_alphabets = available_alphabets
-        self._evaluation_alphabets = list(self.evaluation_dictionary.keys())
+        self._validation_images = available_alphabets
+        self._evaluation_images= list(self.evaluation_dictionary.keys())
 
     def _convert_path_list_to_images_and_labels(self, path_list, is_one_shot_task):
         number_of_pairs = int(len(path_list) / 2)
@@ -232,6 +232,12 @@ class OmniglotLoader:
                                          for image_name in
                                          os.listdir(os.path.join(current_train_path, class_name))]
                             for class_name in available_classes}
+        # class_dictionary = {class_name: [os.path.join(current_train_path, class_name, image_name)
+        #                                  for image_name in
+        #                                  os.listdir(os.path.join(current_train_path, class_name))
+        #                                  if not image_name.startswith('.')]  # 숨김 파일 건너뛰기
+        #                     for class_name in os.listdir(current_train_path)
+        #                     if not class_name.startswith('.')}  # 클래스 디렉토리의 숨김 파일도 건너뛰기
 
         # 클래스(character)들의 수
         number_of_class = len(available_classes)
@@ -272,6 +278,7 @@ class OmniglotLoader:
         #     image = os.path.join(
         #         different_class_images_path, str(image_indexes[0]) + '.png')
         #     batch_images_path.append(image)
+
         for index in selected_characters_indexes:
             current_class = available_classes[index]
             class_images_path = class_dictionary[current_class]
@@ -420,7 +427,7 @@ class OmniglotLoader:
 
             mean_label_accuracy /= number_of_tasks_per_alphabet
 
-            print(label + ' alphabet' + ', accuracy: ' +
+            print(label + ' class' + ', accuracy: ' +
                   str(mean_label_accuracy))
             if is_validation:
                 self._current_validation_label_index += 1

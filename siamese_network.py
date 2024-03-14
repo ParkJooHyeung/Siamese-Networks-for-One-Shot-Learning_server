@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 
 from omniglot_loader import OmniglotLoader
 from modified_sgd import Modified_SGD
+import numpy as np
 
 class SiameseNetwork:
     """Class that constructs the Siamese Net for training
@@ -67,7 +68,7 @@ class SiameseNetwork:
         # self.summary_writer = tf.summary.FileWriter(tensorboard_log_path)
         self._construct_siamese_architecture(learning_rate_multipliers,
                                               l2_regularization_penalization)
-        log_dir = "/content/drive/MyDrive/logs"  # 로그 디렉토리는 적절하게 변경 가능
+        log_dir = "./logs"  # 로그 디렉토리는 적절하게 변경 가능
         self.summary_writer = tf.summary.create_file_writer(log_dir)
         self.current_iteration = 0  # 현재 iteration을 저장할 변수 추가
 
