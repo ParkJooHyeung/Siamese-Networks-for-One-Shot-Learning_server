@@ -103,7 +103,7 @@ def main():
             # Load the weights with best validation accuracy
             siamese_network.model.load_weights('models/' + model_name + '.h5')
             evaluation_accuracy = siamese_network.omniglot_loader.one_shot_test(siamese_network.model,
-                                                                                4, 8, True)
+                                                                                60, 120, False)
         print("Model: " + model_name +
               ' | Accuracy: ' + str(evaluation_accuracy))
         K.clear_session()

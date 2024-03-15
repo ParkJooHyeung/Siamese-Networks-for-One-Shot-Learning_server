@@ -7,11 +7,11 @@ from PIL import Image
 
 from image_augmentor import ImageAugmentor
 
-
 class OmniglotLoader:
     def __init__(self, dataset_path, use_augmentation, batch_size):
         self.dataset_path = dataset_path
-        # self.train_dictionary = {}
+        self.train_dictionary = {}  # train_dictionary 초기화 추가
+        self.evaluation_dictionary = {}
         self.evaluation_dictionary = {}
         self.image_width = 105
         self.image_height = 105
@@ -23,10 +23,11 @@ class OmniglotLoader:
         self._current_train_class_index = 0
         self._current_validation_label_index = 0
         self._current_evaluation_label_index = 0
-
+        self._current_train_alphabet_index = 0  # _current_train_alphabet_index 초기화
+        self.number_of_classes = 0
         self.load_dataset()
 
-        if (self.use_augmentation):
+        if self.use_augmentation:
             self.image_augmentor = self.createAugmentor()
         else:
             self.use_augmentation = []
@@ -39,20 +40,50 @@ class OmniglotLoader:
     #     return alphabet_dictionary
 
 
+
+
     def load_dataset(self):
-        # train_path = '/content/Siamese-Networks-for-One-Shot-Learning/Omniglot Dataset/images_background'
-        # validation_path = '/content/Siamese-Networks-for-One-Shot-Learning/Omniglot Dataset/images_evaluation'
-        train_path = os.path.join(self.dataset_path, 'train')
-        validation_path = os.path.join(self.dataset_path, 'valid')
         # self.train_dictionary = {alphabet: self.load_alphabet_dictionary(os.path.join(train_path, alphabet)) for alphabet in os.listdir(train_path)}
         # self.evaluation_dictionary = {alphabet: self.load_alphabet_dictionary(os.path.join(validation_path, alphabet)) for alphabet in os.listdir(validation_path)}
+        train_path = os.path.join(self.dataset_path, 'train')
+        validation_path = os.path.join(self.dataset_path, 'valid')
+
+        # current_train_path = os.path.join(self.dataset_path, 'train')
+        # available_classes = os.listdir(current_train_path)
+        #
+        # number_of_class = len(available_classes)
+
+        for class_num in range(3):
+            images_path = os.path.join(train_path, str(class_num))
+            images = self.load_images(images_path)
+            self.train_dictionary[class_num] = images
+
+        for class_num in range(3):
+            images_path = os.path.join(validation_path, str(class_num))
+            images = self.load_images(images_path)
+            self.evaluation_dictionary[class_num] = images
+
+    def load_images(self, images_path):
+        images = []
+        for filename in os.listdir(images_path):
+            image_file = os.path.join(images_path, filename)
+            if os.path.isfile(image_file):
+                try:
+                    image = Image.open(image_file).convert('L')  # Convert to grayscale
+                    image = image.resize((self.image_width, self.image_height))  # Resize
+                    image = np.asarray(image).astype(np.float64)
+                    image = image / image.std() - image.mean()  # Normalize
+                    images.append(image)
+                except Exception as e:
+                    print(f"Error loading image file {image_file}: {e}")
+        return images
 
     def get_random_image_path(self, current_class, image_indexes):
         image_folder_name = 'train'
         if self.use_augmentation:
             image_folder_name += '_augmented'
 
-        image_path = os.path.join(self.dataset_path, 'split_data_copy', 'train', current_class)
+        image_path = os.path.join(self.dataset_path, 'split_data_best_concentration', 'train', current_class)
         # return os.path.join(image_path, self.train_dictionary[current_alphabet][current_character][image_indexes[0]])
         return os.path.join(image_path, self.train_dictionary[image_indexes[0]])
 
@@ -214,125 +245,167 @@ class OmniglotLoader:
 
         return pairs_of_images, labels
 
+    # def get_train_batch(self):
+    #     # current_alphabet = self._train_alphabets[self._current_train_alphabet_index]
+    #     # available_characters = list(
+    #     #     self.train_dictionary[current_alphabet].keys())
+    #     # available_characters = list(
+    #     #          self.train_dictionary[current_alphabet].keys())
+    #     # number_of_class = len(available_characters)
+    #     # 현재 알파벳에 대해 사용 가능한 클래스(character)들을 확인
+    #     current_train_path = os.path.join(self.dataset_path, 'train')
+    #     available_classes = os.listdir(current_train_path)
+    #
+    #     # 클래스(character)들에 대한 딕셔너리 생성
+    #     # class_dictionary = {class_name: os.path.join(current_train_path, class_name, 'images') for class_name in
+    #     #                     available_classes}
+    #     class_dictionary = {class_name: [os.path.join(current_train_path, class_name, image_name)
+    #                                      for image_name in
+    #                                      os.listdir(os.path.join(current_train_path, class_name))]
+    #                         for class_name in available_classes}
+    #     # class_dictionary = {class_name: [os.path.join(current_train_path, class_name, image_name)
+    #     #                                  for image_name in
+    #     #                                  os.listdir(os.path.join(current_train_path, class_name))
+    #     #                                  if not image_name.startswith('.')]  # 숨김 파일 건너뛰기
+    #     #                     for class_name in os.listdir(current_train_path)
+    #     #                     if not class_name.startswith('.')}  # 클래스 디렉토리의 숨김 파일도 건너뛰기
+    #
+    #     # 클래스(character)들의 수
+    #     number_of_class = len(available_classes)
+    #
+    #     batch_images_path = []
+    #
+    #     # If the number of classes is less than self.batch_size/2
+    #     # we have to repeat characters
+    #     selected_characters_indexes = [random.randint(
+    #         0, number_of_class - 1) for i in range(self.batch_size)]
+    #
+    #     # for index in selected_characters_indexes:
+    #     #     current_class = available_classes[index]
+    #     #     class_images_path = class_dictionary[current_class]
+    #     #
+    #     #     # Randomly select 3 indexes of images from the same class (Remember
+    #     #     # that for each class we have 20 examples).
+    #     #     image_indexes = random.sample(range(0, 20), 3)
+    #     #
+    #     #     for i in range(2):
+    #     #         image = os.path.join(
+    #     #             class_images_path, str(image_indexes[i]) + '.jpg')
+    #     #         batch_images_path.append(image)
+    #     #
+    #     #     # Now let's take care of the pair of images from different classes
+    #     #     image = os.path.join(
+    #     #         class_images_path, str(image_indexes[2]) + '.jpg')
+    #     #     batch_images_path.append(image)
+    #     #
+    #     #     different_classes = available_classes[:]
+    #     #     different_classes.pop(index)
+    #     #     different_class_index = random.sample(
+    #     #         range(0, number_of_class - 1), 1)
+    #     #     different_class = different_classes[different_class_index[0]]
+    #     #     different_class_images_path = class_dictionary[different_class]
+    #     #
+    #     #     image_indexes = random.sample(range(0, 20), 1)
+    #     #     image = os.path.join(
+    #     #         different_class_images_path, str(image_indexes[0]) + '.png')
+    #     #     batch_images_path.append(image)
+    #
+    #     for index in selected_characters_indexes:
+    #         current_class = available_classes[index]
+    #         class_images_path = class_dictionary[current_class]
+    #
+    #         # Randomly select 3 indexes of images from the same class (Remember
+    #         # that for each class we have 20 examples).
+    #         image_indexes = random.sample(range(0, 20), 3)
+    #
+    #         for i in range(2):
+    #             # 수정된 부분: 이미지 경로를 직접 리스트에서 가져옵니다.
+    #             image = class_images_path[image_indexes[i]]
+    #             batch_images_path.append(image)
+    #
+    #         # Now let's take care of the pair of images from different classes
+    #         # 수정된 부분: 이미지 경로를 직접 리스트에서 가져옵니다.
+    #         image = class_images_path[image_indexes[2]]
+    #         batch_images_path.append(image)
+    #
+    #         different_classes = available_classes[:]
+    #         different_classes.pop(index)
+    #         different_class_index = random.sample(
+    #             range(0, number_of_class - 1), 1)
+    #         different_class = different_classes[different_class_index[0]]
+    #         different_class_images_path = class_dictionary[different_class]
+    #
+    #         image_indexes = random.sample(range(0, 20), 1)
+    #         # 수정된 부분: 이미지 경로를 직접 리스트에서 가져옵니다.
+    #         image = different_class_images_path[image_indexes[0]]
+    #         batch_images_path.append(image)
+    #
+    #     self._current_train_class_index += 1
+    #
+    #     if (self._current_train_class_index > 23):
+    #         self._current_train_class_index = 0
+    #
+    #     images, labels = self._convert_path_list_to_images_and_labels(
+    #         batch_images_path, is_one_shot_task=False)
+    #
+    #     # Get random transforms if augmentation is on
+    #     if self.use_augmentation:
+    #         images = self.image_augmentor.get_random_transform(images)
+    #
+    #     return images, labels
+
     def get_train_batch(self):
-        # current_alphabet = self._train_alphabets[self._current_train_alphabet_index]
-        # available_characters = list(
-        #     self.train_dictionary[current_alphabet].keys())
-        # available_characters = list(
-        #          self.train_dictionary[current_alphabet].keys())
-        # number_of_class = len(available_characters)
-        # 현재 알파벳에 대해 사용 가능한 클래스(character)들을 확인
         current_train_path = os.path.join(self.dataset_path, 'train')
-        available_classes = os.listdir(current_train_path)
+        available_alphabets = os.listdir(current_train_path)
 
-        # 클래스(character)들에 대한 딕셔너리 생성
-        # class_dictionary = {class_name: os.path.join(current_train_path, class_name, 'images') for class_name in
-        #                     available_classes}
-        class_dictionary = {class_name: [os.path.join(current_train_path, class_name, image_name)
-                                         for image_name in
-                                         os.listdir(os.path.join(current_train_path, class_name))]
-                            for class_name in available_classes}
-        # class_dictionary = {class_name: [os.path.join(current_train_path, class_name, image_name)
-        #                                  for image_name in
-        #                                  os.listdir(os.path.join(current_train_path, class_name))
-        #                                  if not image_name.startswith('.')]  # 숨김 파일 건너뛰기
-        #                     for class_name in os.listdir(current_train_path)
-        #                     if not class_name.startswith('.')}  # 클래스 디렉토리의 숨김 파일도 건너뛰기
-
-        # 클래스(character)들의 수
-        number_of_class = len(available_classes)
-
+        # 알파벳 폴더 내 이미지 경로 가져오기
         batch_images_path = []
+        selected_alphabets_indexes = [random.randint(0, len(available_alphabets) - 1) for i in range(self.batch_size)]
 
-        # If the number of classes is less than self.batch_size/2
-        # we have to repeat characters
-        selected_characters_indexes = [random.randint(
-            0, number_of_class - 1) for i in range(self.batch_size)]
+        for index in selected_alphabets_indexes:
+            current_alphabet = available_alphabets[index]
+            alphabet_images_path = os.path.join(current_train_path, current_alphabet)
+            alphabet_images = [os.path.join(alphabet_images_path, image_name) for image_name in
+                               os.listdir(alphabet_images_path)]
 
-        # for index in selected_characters_indexes:
-        #     current_class = available_classes[index]
-        #     class_images_path = class_dictionary[current_class]
-        #
-        #     # Randomly select 3 indexes of images from the same class (Remember
-        #     # that for each class we have 20 examples).
-        #     image_indexes = random.sample(range(0, 20), 3)
-        #
-        #     for i in range(2):
-        #         image = os.path.join(
-        #             class_images_path, str(image_indexes[i]) + '.jpg')
-        #         batch_images_path.append(image)
-        #
-        #     # Now let's take care of the pair of images from different classes
-        #     image = os.path.join(
-        #         class_images_path, str(image_indexes[2]) + '.jpg')
-        #     batch_images_path.append(image)
-        #
-        #     different_classes = available_classes[:]
-        #     different_classes.pop(index)
-        #     different_class_index = random.sample(
-        #         range(0, number_of_class - 1), 1)
-        #     different_class = different_classes[different_class_index[0]]
-        #     different_class_images_path = class_dictionary[different_class]
-        #
-        #     image_indexes = random.sample(range(0, 20), 1)
-        #     image = os.path.join(
-        #         different_class_images_path, str(image_indexes[0]) + '.png')
-        #     batch_images_path.append(image)
-
-        for index in selected_characters_indexes:
-            current_class = available_classes[index]
-            class_images_path = class_dictionary[current_class]
-
-            # Randomly select 3 indexes of images from the same class (Remember
-            # that for each class we have 20 examples).
-            image_indexes = random.sample(range(0, 20), 3)
-
+            # 무작위로 3개의 이미지 선택
+            selected_image_indexes = random.sample(range(len(alphabet_images)), 3)
             for i in range(2):
-                # 수정된 부분: 이미지 경로를 직접 리스트에서 가져옵니다.
-                image = class_images_path[image_indexes[i]]
-                batch_images_path.append(image)
+                batch_images_path.append(alphabet_images[selected_image_indexes[i]])
 
-            # Now let's take care of the pair of images from different classes
-            # 수정된 부분: 이미지 경로를 직접 리스트에서 가져옵니다.
-            image = class_images_path[image_indexes[2]]
-            batch_images_path.append(image)
+            # 다른 알파벳에서 이미지 선택
+            other_alphabets = available_alphabets[:]
+            other_alphabets.pop(index)
+            selected_other_alphabet_index = random.sample(range(len(other_alphabets)), 1)
+            selected_other_alphabet = other_alphabets[selected_other_alphabet_index[0]]
+            other_alphabet_images_path = os.path.join(current_train_path, selected_other_alphabet)
+            other_alphabet_images = [os.path.join(other_alphabet_images_path, image_name) for image_name in
+                                     os.listdir(other_alphabet_images_path)]
+            selected_image_index = random.sample(range(len(other_alphabet_images)), 1)
+            batch_images_path.append(other_alphabet_images[selected_image_index[0]])
 
-            different_classes = available_classes[:]
-            different_classes.pop(index)
-            different_class_index = random.sample(
-                range(0, number_of_class - 1), 1)
-            different_class = different_classes[different_class_index[0]]
-            different_class_images_path = class_dictionary[different_class]
+        self._current_train_alphabet_index += 1
 
-            image_indexes = random.sample(range(0, 20), 1)
-            # 수정된 부분: 이미지 경로를 직접 리스트에서 가져옵니다.
-            image = different_class_images_path[image_indexes[0]]
-            batch_images_path.append(image)
+        if self._current_train_alphabet_index >= len(available_alphabets):
+            self._current_train_alphabet_index = 0
 
-        self._current_train_class_index += 1
+        images, labels = self._convert_path_list_to_images_and_labels(batch_images_path, is_one_shot_task=False)
 
-        if (self._current_train_class_index > 23):
-            self._current_train_class_index = 0
-
-        images, labels = self._convert_path_list_to_images_and_labels(
-            batch_images_path, is_one_shot_task=False)
-
-        # Get random transforms if augmentation is on
+        # 데이터 증강
         if self.use_augmentation:
             images = self.image_augmentor.get_random_transform(images)
 
         return images, labels
 
-
     def get_one_shot_batch(self, support_set_size, is_validation):
         if is_validation:
-            alphabets = self._validation_alphabets
-            current_alphabet_index = self._current_validation_alphabet_index
+            alphabets = self._validation_images
+            current_alphabet_index = self._current_validation_label_index
             image_folder_name = 'train'
             dictionary = self.train_dictionary
         else:
-            alphabets = self._evaluation_alphabets
-            current_alphabet_index = self._current_evaluation_alphabet_index
+            alphabets = self._evaluation_images
+            current_alphabet_index = self._current_evaluation_label_index
             image_folder_name = 'valid'
             dictionary = self.evaluation_dictionary
 
