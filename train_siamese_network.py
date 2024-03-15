@@ -37,12 +37,12 @@ def main():
     momentum = 0.9
     # linear epoch slope evolution
     momentum_slope = 0.01
-    support_set_size = 3
-    # evaluate_each = 1000
+    support_set_size = 20
+    evaluate_each = 1000
     # evaluate_each = 100
-    evaluate_each = 10
-    # number_of_train_iterations = 1000000
-    number_of_train_iterations = 10000
+    # evaluate_each = 10
+    number_of_train_iterations = 1000000
+    # number_of_train_iterations = 10000
 
     validation_accuracy = siamese_network.train_siamese_network(number_of_iterations=number_of_train_iterations,
                                                                 support_set_size=support_set_size,
@@ -56,7 +56,7 @@ def main():
         # Load the weights with best validation accuracy
         siamese_network.model.load_weights('./models/siamese_net_lr10e-4.h5')
         evaluation_accuracy = siamese_network.omniglot_loader.one_shot_test(siamese_network.model,
-                                                                        4, 8, False)
+                                                                        4, 8, True)
 
     print('Final Evaluation Accuracy = ' + str(evaluation_accuracy))
 

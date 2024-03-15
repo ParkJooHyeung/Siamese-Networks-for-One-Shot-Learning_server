@@ -102,14 +102,14 @@ class SiameseNetwork:
                                      name='Conv2'))
         convolutional_net.add(MaxPool2D())
 
-        convolutional_net.add(Conv2D(filters=128, kernel_size=(4, 4),
+        convolutional_net.add(Conv2D(filters=256, kernel_size=(4, 4),
                                      activation='relu',
                                      kernel_regularizer=l2(
                                          l2_regularization_penalization['Conv3']),
                                      name='Conv3'))
         convolutional_net.add(MaxPool2D())
 
-        convolutional_net.add(Conv2D(filters=256, kernel_size=(4, 4),
+        convolutional_net.add(Conv2D(filters=512, kernel_size=(1, 1),
                                      activation='relu',
                                      kernel_regularizer=l2(
                                          l2_regularization_penalization['Conv4']),
@@ -117,13 +117,13 @@ class SiameseNetwork:
 
         convolutional_net.add(Flatten())
         convolutional_net.add(
-            Dense(units=4096, activation='sigmoid',
+            Dense(units=8192, activation='sigmoid',
                   kernel_regularizer=l2(
                       l2_regularization_penalization['Dense1']),
                   name='Dense1'))
         convolutional_net.add(BatchNormalization())
         # Dropout 추가
-        convolutional_net.add(Dropout(0.5))
+        convolutional_net.add(Dropout(0.7))
 
         # Now the pairs of images
         input_image_1 = Input(self.input_shape)

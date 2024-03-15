@@ -9,31 +9,31 @@ current_model_number = 0
 
 def main():
     hyperparameters = [{'name': 'learning_rate', 'type': 'continuous',
-                        'domain': (10e-8, 10e-6, 10e-4, 10e-2)},
+                        'domain': (10e-6, 10e-4)},
                        {'name': 'momentum', 'type': 'continuous',
-                        'domain': (0.0, 0.5, 1.0)},
+                        'domain': (0.0, 1.0)},
                        {'name': 'momentum_slope', 'type': 'continuous',
-                        'domain': (0.001, 0.01, 0.1)},
+                        'domain': (0.001, 0.1)},
                        {'name': 'Conv1_multiplier', 'type': 'discrete',
-                        'domain': (0.001, 0.01, 0.1, 1, 10, 100)},
+                        'domain': (0.01, 0.1, 1, 10)},
                        {'name': 'Conv2_multiplier', 'type': 'discrete',
-                        'domain': (0.001, 0.01, 0.1, 1, 10, 100)},
+                        'domain': (0.01, 0.1, 1, 10)},
                        {'name': 'Conv3_multiplier', 'type': 'discrete',
-                        'domain': (0.001, 0.01, 0.1, 1, 10, 100)},
+                        'domain': (0.01, 0.1, 1, 10)},
                        {'name': 'Conv4_multiplier', 'type': 'discrete',
-                        'domain': (0.001, 0.01, 0.1, 1, 10, 100)},
+                        'domain': (0.01, 0.1, 1, 10)},
                        {'name': 'Dense1_multiplier', 'type': 'discrete',
-                        'domain': (0.001, 0.01, 0.1, 1, 10, 100)},
+                        'domain': (0.01, 0.1, 1, 10)},
                        {'name': 'l2_penalization_Conv1', 'type': 'discrete',
-                        'domain': (0, 0.00001, 0.0001, 0.001, 0.01, 0.1)},
+                        'domain': (0, 0.0001, 0.001, 0.01, 0.1)},
                        {'name': 'l2_penalization_Conv2', 'type': 'discrete',
-                        'domain': (0, 0.00001, 0.0001, 0.001, 0.01, 0.1)},
+                        'domain': (0, 0.0001, 0.001, 0.01, 0.1)},
                        {'name': 'l2_penalization_Conv3', 'type': 'discrete',
-                        'domain': (0, 0.00001, 0.0001, 0.001, 0.01, 0.1)},
+                        'domain': (0, 0.0001, 0.001, 0.01, 0.1)},
                        {'name': 'l2_penalization_Conv4', 'type': 'discrete',
-                        'domain': (0, 0.00001, 0.0001, 0.001, 0.01, 0.1)},
+                        'domain': (0, 0.0001, 0.001, 0.01, 0.1)},
                        {'name': 'l2_penalization_Dense1', 'type': 'discrete',
-                        'domain': (0, 0.00001, 0.0001, 0.001, 0.01, 0.1)}]
+                        'domain': (0, 0.0001, 0.001, 0.01, 0.1)}]
 
     def bayesian_optimization_function(x):
         dataset_path = '/home/server3/jhpark/split_data_best_concentration'
@@ -88,8 +88,7 @@ def main():
 
         support_set_size = 20
         evaluate_each = 500
-        number_of_train_iterations = 10000
-        # number_of_train_iterations = 100000
+        number_of_train_iterations = 100000
 
         validation_accuracy = siamese_network.train_siamese_network(number_of_iterations=number_of_train_iterations,
                                                                     support_set_size=support_set_size,
@@ -104,7 +103,7 @@ def main():
             # Load the weights with best validation accuracy
             siamese_network.model.load_weights('models/' + model_name + '.h5')
             evaluation_accuracy = siamese_network.omniglot_loader.one_shot_test(siamese_network.model,
-                                                                                20, 40, False)
+                                                                                4, 8, True)
         print("Model: " + model_name +
               ' | Accuracy: ' + str(evaluation_accuracy))
         K.clear_session()
